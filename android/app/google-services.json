@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "141479042352",
+    "project_id": "text-summarizer-ai-demo",
+    "storage_bucket": "text-summarizer-ai-demo.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:141479042352:android:d7ebaf84d2120c8f7efcf5",
+        "android_client_info": {
+          "package_name": "com.example.text_summarizer_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAtBhIALJdNGfN4v7A8gQhWrhfbx9ZAhtw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
