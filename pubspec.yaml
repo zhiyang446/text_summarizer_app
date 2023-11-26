@@ -39,10 +39,16 @@ dependencies:
   social_auth_buttons: ^2.0.2
   flutter_social_button: ^1.1.4+1
   lottie: ^2.7.0
-  file_picker: ^4.1.4
-  firebase_core: ^2.21.0
-  firebase_auth: ^4.12.1
+  file_picker: ^6.0.0
+  firebase_core: ^2.23.0
+  firebase_auth: ^4.14.1
   firebase_storage: ^11.4.1
+  permission_handler: ^11.0.1
+  cloud_firestore: ^4.12.2
+  flutter_facebook_auth: ^6.0.3
+  google_sign_in: ^6.1.6
+  firebase_core_platform_interface: ^5.0.0
+  firebase_app_check: ^0.2.1+5
 
 dev_dependencies:
   flutter_test:
