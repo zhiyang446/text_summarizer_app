@@ -4,29 +4,29 @@ import 'package:flutter/cupertino.dart';
 
 class SelectFile {
   static bool isFileSelected = false;
-  static String fileURL = '';
+  static String selectedFilePath = '';
+  static File? selectedFile;
 
-  static Future<void> pickFile(BuildContext context) async {
+  static Future<FilePickerResult?> pickFile(BuildContext context) async {
     FilePickerResult? result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
+      type: FileType.custom,
+      allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
     );
 
     if (result != null && result.files.isNotEmpty) {
-      String? filePath = result.files.single.path;
-      if (filePath != null) {
-        fileURL = filePath;
-        isFileSelected = true;
-      }
+      selectedFile = File(result.files.single.path!);
+      selectedFilePath = selectedFile!.path;
+      isFileSelected = true;
+      return result;
     } else {
-      // The user canceled the file selection, so clear the selection
-      fileURL = '';
+      selectedFilePath = '';
       isFileSelected = false;
+      return null;
     }
   }
 
   static void deselectFile() {
-    fileURL = '';
+    selectedFilePath = '';
     isFileSelected = false;
   }
 }
-

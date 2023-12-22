@@ -1,42 +1,30 @@
-import 'dart:io';
-import 'package:firebase_storage/firebase_storage.dart';
-import 'package:file_picker/file_picker.dart';
-import 'package:permission_handler/permission_handler.dart';
+  import 'dart:io';
+  import 'package:firebase_storage/firebase_storage.dart';
 
-class FileUpload {
-  static Future<void> uploadFile() async {
-    try {
-      final status = await Permission.storage.request();
-      if (status.isGranted) {
-        FilePickerResult? result = await FilePicker.platform.pickFiles(
-          type: FileType.any,
-          allowMultiple: false,
-        );
+  class FileUploadResult {
+    final String fileURL;
+    final String fileName;
 
-        if (result != null) {
-          File file = File(result.files.single.path!);
+    FileUploadResult(this.fileURL,this.fileName);
+  }
 
-          try {
-            // Initialize Firebase Storage
-            final Reference storageRef =
-            FirebaseStorage.instance.ref().child('uploads/${file.uri.pathSegments.last}');
+  class FileUpload {
+    static Future<FileUploadResult?> uploadFileToBoth(File file) async {
+      try {
+        final Reference storageRef = FirebaseStorage.instance
+            .ref()
+            .child('pdfs/${file.uri.pathSegments.last}');
 
-            // Upload the file to Firebase Storage
-            await storageRef.putFile(file);
+        UploadTask uploadTask = storageRef.putFile(file);
 
-            print('File uploaded to Firebase Storage');
-          } catch (e) {
-            print('Error during file upload: $e');
-          }
-        } else {
-          // User canceled the file picker.
-        }
-      } else {
-        // Permission denied.
-        print('Permission denied to access external storagesss');
+        await uploadTask.whenComplete(() {});
+
+        String fileURL = await storageRef.getDownloadURL();
+
+        return FileUploadResult(fileURL,file.uri.pathSegments.last);
+      } catch (e) {
+        print('Error during file upload: $e');
+        throw e;
       }
-    } catch (e) {
-      print('Error during file upload: $e');
     }
   }
-}

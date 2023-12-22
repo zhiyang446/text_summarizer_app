@@ -44,7 +44,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home:  WelcomeScreen(),
+      home:   HistoryPage(),
       routes: {
         '/home': (context) => HomeScreen(),
         '/login':(context) => SignInScreen(),
@@ -83,6 +83,7 @@ class WelcomeScreen extends StatelessWidget {
                       TextSpan(
                           text: "Text Summarizer AI\n",
                           style: TextStyle(
+                            color: Colors.black,
                             fontFamily: 'Teko',
                             fontSize: 50,
                             fontWeight: FontWeight.bold,
@@ -91,8 +92,10 @@ class WelcomeScreen extends StatelessWidget {
                       TextSpan(
                           text: "Discover and summarize long texts with ease !",
                           style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.black,
                             fontFamily: 'Roboto Condensed',
-                            fontSize: 15,
+                            fontSize: 18,
                             fontStyle: FontStyle.italic,
                           ))
                     ],

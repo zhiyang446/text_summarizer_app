@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:text_summarizer_app/history_screen.dart';
 
 class DrawerBar extends StatefulWidget {
   const DrawerBar({Key? key}) : super(key: key);
@@ -123,7 +124,10 @@ class _DrawerBarState extends State<DrawerBar> {
             leading: Icon(Icons.history),
             title: Text('History'),
             onTap: () {
-              // Add logic for handling history
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const HistoryPage()),
+              );
             },
           ),
           ListTile(

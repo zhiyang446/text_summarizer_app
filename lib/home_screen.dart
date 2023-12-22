@@ -1,3 +1,4 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:getwidget/components/avatar/gf_avatar.dart';
@@ -8,8 +9,14 @@ import 'package:text_summarizer_app/drawer.dart';
 import 'package:text_summarizer_app/function/select_file.dart';
 import 'package:text_summarizer_app/function/firebase_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:text_summarizer_app/result_screen.dart';
 
+import 'function/document_process.dart';
+import 'function/openai_sercive.dart';
 import 'function/save_data.dart';
+import 'function/summary_processing.dart';
+import 'function/upload_file.dart';
+import 'loading_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -20,20 +27,39 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey<ScaffoldState> scaffoldKey = GlobalKey<ScaffoldState>();
-  int _selectedWordIndex = -1; // Initially, no word selected
+  int _selectedlanguageIndex = -1; // Initially, no word selected
   int _selectedModeIndex = -1;
   int _selectedToneIndex = -1;
-  late TextEditingController
-      summaryController;
+  late TextEditingController summaryController;
   User? _user;
 
-  List word = ['150', '300', '500', '700', '1000'];
-  List mode = ['Rephrase', 'Shorten', 'Expand', 'Email', 'Summarize'];
-  List tone = ['Professional', 'Academic', 'Business', 'Friendly'];
+  List language = [
+    'English',
+    'Chinese',
+    'Korean',
+    'German',
+    'French',
+    'Japanese'
+  ];
+  List mode = [
+    'Expository',
+    'Third Person',
+    'Present Tense',
+    'Bullet Point',
+    'Methodologies',
+    'Implications'
+  ];
+  List tone = [
+    'Objective',
+    'Formal',
+    'Concise',
+    'Descriptive',
+    'Critical',
+    'Informal'
+  ];
 
-  SelectFile selectFile = SelectFile();
   FirebaseService firebaseService =
-      FirebaseService(); // Create an instance of FirebaseService
+  FirebaseService(); // Create an instance of FirebaseService
 
   @override
   void initState() {
@@ -56,7 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
       if (userId != null) {
         // Fetch additional user info from Firestore
         DocumentSnapshot<Map<String, dynamic>> snapshot =
-        await FirebaseFirestore.instance.collection('users').doc(userId).get();
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .get();
 
         if (snapshot.exists) {
           setState(() {
@@ -148,44 +177,39 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(width: 35),
                     Container(
-                      child: SelectFile.isFileSelected
-                          ? ElevatedButton.icon(
-                              label: Text("Deselect File"),
-                              icon: Icon(Icons.cancel),
-                              style: ElevatedButton.styleFrom(
-                                shape: ContinuousRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                primary: Colors.red,
-                              ),
-                              onPressed: () {
-                                SelectFile.deselectFile();
-                                setState(() {});
-                              },
-                            )
-                          : ElevatedButton.icon(
-                              label: const Text(
-                                "Select File",
-                                style: TextStyle(
-                                  color: Colors.black,
-                                ),
-                              ),
-                              icon:
-                                  Icon(Icons.upload_file, color: Colors.black),
-                              style: ElevatedButton.styleFrom(
-                                primary: Colors.grey[200],
-                                shape: ContinuousRectangleBorder(
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                shadowColor: Colors.grey[500],
-                              ),
-                              onPressed: () {
-                                if (!SelectFile.isFileSelected) {
-                                  SelectFile.pickFile(context);
-                                  setState(() {});
-                                }
-                              },
-                            ),
+                      child: ElevatedButton.icon(
+                        label: Text(
+                          SelectFile.isFileSelected ? "Deselect File" : "Select File",
+                          style: TextStyle(
+                            color:
+                            SelectFile.isFileSelected ? Colors.white : Colors.black,
+                          ),
+                        ),
+                        icon: Icon(
+                          SelectFile.isFileSelected ? Icons.cancel : Icons.upload_file,                          color:
+                        SelectFile.isFileSelected ? Colors.white : Colors.black,
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          primary:
+                          SelectFile.isFileSelected ? Colors.red : Colors.grey[200],
+                          shape: ContinuousRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          shadowColor: Colors.grey[500],
+                        ),
+                        onPressed: () async {
+                          if (SelectFile.isFileSelected) {
+                            SelectFile.deselectFile();
+                          } else {
+                            // Handle file selection logic, e.g., show file picker
+                            FilePickerResult? result =
+                            await SelectFile.pickFile(context);
+                            // After selecting a file, call SelectFile.selectFile(file);
+                          }
+                          // Ensure to call setState to trigger a rebuild
+                          setState(() {});
+                        },
+                      ),
                     ),
                   ],
                 ),
@@ -224,7 +248,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     mainAxisAlignment: MainAxisAlignment.start,
                     children: [
                       Text(
-                        'Word :',
+                        'Language :',
                         style: TextStyle(
                           fontSize: 20,
                           fontFamily: 'Roboto Condensed',
@@ -239,7 +263,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: List.generate(word.length, (index) {
+                      children: List.generate(language.length, (index) {
                         return Padding(
                           padding: const EdgeInsets.all(8.0),
                           child: ChoiceChip(
@@ -251,8 +275,8 @@ class _HomeScreenState extends State<HomeScreen> {
                               horizontal: 25,
                               vertical: 15,
                             ),
-                            label: Text(word[index].toString()),
-                            selected: _selectedWordIndex == index,
+                            label: Text(language[index].toString()),
+                            selected: _selectedlanguageIndex == index,
                             selectedColor: kPrimaryColor,
                             shape: ContinuousRectangleBorder(
                               borderRadius: BorderRadius.circular(20),
@@ -260,10 +284,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             onSelected: (selected) {
                               setState(() {
                                 if (selected) {
-                                  _selectedWordIndex = index;
+                                  _selectedlanguageIndex = index;
                                 } else {
-                                  _selectedWordIndex =
-                                      -1; // Unselect when tapped again
+                                  _selectedlanguageIndex =
+                                  -1; // Unselect when tapped again
                                 }
                               });
                             },
@@ -318,7 +342,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _selectedModeIndex = index;
                                 } else {
                                   _selectedModeIndex =
-                                      -1; // Unselect when tapped again
+                                  -1; // Unselect when tapped again
                                 }
                               });
                             },
@@ -373,7 +397,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   _selectedToneIndex = index;
                                 } else {
                                   _selectedToneIndex =
-                                      -1; // Unselect when tapped again
+                                  -1; // Unselect when tapped again
                                 }
                               });
                             },
@@ -394,8 +418,8 @@ class _HomeScreenState extends State<HomeScreen> {
                           style: TextStyle(color: Colors.white),
                         ),
                         icon: const Icon(
-                            Icons.send_sharp,
-                            color: Colors.white,
+                          Icons.send_sharp,
+                          color: Colors.white,
                         ),
                         style: ElevatedButton.styleFrom(
                           padding: EdgeInsets.fromLTRB(80, 10, 80, 10),
@@ -405,9 +429,11 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           shadowColor: Colors.black87,
                         ),
-                        onPressed: () {
+                        onPressed: isSubmitButtonEnabled()
+                            ? () {
                           saveUserData();
-                        },
+                        }
+                            : null,
                       ),
                     ],
                   ),
@@ -420,13 +446,99 @@ class _HomeScreenState extends State<HomeScreen> {
       drawer: const DrawerBar(),
     );
   }
-  void saveUserData() {
-    SaveData.saveUserData(
-      context: context,
-      summaryController: summaryController,
-      selectedWordIndex: _selectedWordIndex,
-      selectedModeIndex: _selectedModeIndex,
-      selectedToneIndex: _selectedToneIndex,
-    );
+
+  Future<void> saveUserData() async {
+    try {
+      // Show loading screen
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => LoadingScreen()),
+      );
+
+      // Check if neither a file nor summary is selected
+      if (!SelectFile.isFileSelected && summaryController.text.isEmpty) {
+        // Show an error message to the user
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Please select a file or enter a summary to submit.'),
+        ));
+        return; // Exit the function early
+      }
+
+      // Check if a file is selected
+      if (SelectFile.isFileSelected && SelectFile.selectedFile != null) {
+        // Upload the file
+        FileUploadResult? fileUploadResult =
+        await FileUpload.uploadFileToBoth(SelectFile.selectedFile!);
+
+        // Save user data with the file URL
+        SaveData.saveUserData(
+          context: context,
+          summaryController: summaryController,
+          selectedlanguageIndex: _selectedlanguageIndex,
+          selectedModeIndex: _selectedModeIndex,
+          selectedToneIndex: _selectedToneIndex,
+          fileUploadResult: fileUploadResult,
+        );
+
+// Initialize document processor
+        DocumentProcessor documentProcessor = DocumentProcessor();
+
+// Extract text from the document and generate summary
+        await documentProcessor.extractTextFromDocumentAndProcess(
+          context: context,
+          documentFile: SelectFile.selectedFile!,
+          selectedLanguageIndex: _selectedlanguageIndex,
+          selectedModeIndex: _selectedModeIndex,
+          selectedToneIndex: _selectedToneIndex,
+        );
+
+      } else {
+        // Save user data without a file URL
+        SaveData.saveUserData(
+          context: context,
+          summaryController: summaryController,
+          selectedlanguageIndex: _selectedlanguageIndex,
+          selectedModeIndex: _selectedModeIndex,
+          selectedToneIndex: _selectedToneIndex,
+          fileUploadResult: null,
+        );
+        List<Map<String, dynamic>> historicalData = await FirebaseService().getHistoricalData();
+        // Initialize summary processor
+        SummaryProcessor summaryProcessor = SummaryProcessor();
+
+        // Process summary from input text
+        String generatedSummary =
+        await summaryProcessor.generateSummaryFromText(
+          summary: summaryController.text,
+          selectedlanguageIndex: _selectedlanguageIndex,
+          selectedModeIndex: _selectedModeIndex,
+          selectedToneIndex: _selectedToneIndex,
+          historicalData: historicalData, // Provide historical data here
+        );
+
+        // Navigate to the result screen with the generated summary
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => ResultScreen(summary: generatedSummary),
+          ),
+        );
+      }
+    } catch (error) {
+      // Handle errors, e.g., show an error message to the user
+      print('Error: $error');
+      // Show an error message to the user
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Error: $error'),
+      ));
+    }
+  }
+
+  bool isSubmitButtonEnabled() {
+    if (!SelectFile.isFileSelected && summaryController.text.isEmpty) {
+      return false; // Disable the button if neither a file nor summary is selected
+    }
+    // Add any additional validation checks here if needed
+    return true; // Enable the button if the form is valid
   }
 }
