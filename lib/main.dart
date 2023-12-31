@@ -1,4 +1,5 @@
 import 'package:text_summarizer_app/constants.dart';
+import 'package:text_summarizer_app/function/example.dart';
 import 'package:text_summarizer_app/register._screen.dart';
 import 'package:text_summarizer_app/signin_screen.dart';
 import 'package:flutter/material.dart';
@@ -44,7 +45,7 @@ class MyApp extends StatelessWidget {
           ),
         ),
       ),
-      home:   HistoryPage(),
+      home:   HomeScreen(),
       routes: {
         '/home': (context) => HomeScreen(),
         '/login':(context) => SignInScreen(),

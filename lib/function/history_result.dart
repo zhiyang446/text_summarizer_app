@@ -23,28 +23,63 @@ class HistoryResult {
     }
   }
 
-  static Future<List<Map<String, dynamic>>> getHistoricalData(String summarizerID) async {
-    try {
-      // Get a reference to the 'history' subcollection under the current 'summarizerID'
+  Future<List<Map<String, dynamic>>> getHistoricalData(String summarizerID) async {
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      String userID = user.uid;
+
       CollectionReference historyCollection = FirebaseFirestore.instance
-          .collection('users')
-          .doc(FirebaseAuth.instance.currentUser!.uid)
-          .collection('summarizer')
-          .doc(summarizerID)
-          .collection('history');
+          .collection('users/$userID/summarizer/$summarizerID/history');
 
-      // Get all documents from the 'history' collection
-      QuerySnapshot<Map<String, dynamic>> querySnapshot = await historyCollection.get() as QuerySnapshot<Map<String, dynamic>>;
+      try {
+        QuerySnapshot<Map<String, dynamic>> querySnapshot =
+        await historyCollection.get() as QuerySnapshot<Map<String, dynamic>>;
 
-      // Extract historical data from the documents
-      List<Map<String, dynamic>> historicalData = querySnapshot.docs
-          .map((QueryDocumentSnapshot<Map<String, dynamic>> doc) => doc.data()!)
-          .toList();
+        List<Map<String, dynamic>> historicalData = querySnapshot.docs
+            .map((QueryDocumentSnapshot<Map<String, dynamic>> doc) => {
+          'historyID': doc.id,
+          'summary': doc.data()?['summary'],
+          // Add other data as needed
+        })
+            .toList();
 
-      return historicalData;
-    } catch (e) {
-      print('Error fetching historical data: $e');
-      throw e;
+        return historicalData;
+      } catch (e) {
+        print('Error fetching historical data: $e');
+        throw e;
+      }
+    } else {
+      print('User is not authenticated.');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getSummarizerData() async {
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      String userID = user.uid;
+
+      CollectionReference summarizerCollection =
+      FirebaseFirestore.instance.collection('users/$userID/summarizer');
+
+      try {
+        QuerySnapshot summarizers = await summarizerCollection.get();
+        List<Map<String, dynamic>> summarizerData = summarizers.docs
+            .map((QueryDocumentSnapshot summarizer) => {
+          'summarizerID': summarizer.id,
+          // Include other fields
+        })
+            .toList();
+        return summarizerData;
+      } catch (e) {
+        print('Error fetching summarizer data: $e');
+        throw e;
+      }
+    } else {
+      print('User is not authenticated.');
+      return [];
     }
   }
 }

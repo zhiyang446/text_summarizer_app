@@ -1,9 +1,8 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:clipboard/clipboard.dart'; // Import the clipboard package
 
-import 'function/history_result.dart';
-import 'historyresult_screen.dart';
 import 'home_screen.dart';
 
 class HistoryPage extends StatefulWidget {
@@ -14,194 +13,135 @@ class HistoryPage extends StatefulWidget {
 }
 
 class _HistoryPageState extends State<HistoryPage> {
-  late Future<QuerySnapshot<Map<String, dynamic>>> _historyCollectionFuture;
+  late Future<List<Map<String, dynamic>>> _historyCollectionFuture;
   User? user;
 
   @override
   void initState() {
     super.initState();
-    _historyCollectionFuture = _getUserInfo();
+    _historyCollectionFuture = getSummarizerData();
   }
 
-  Future<QuerySnapshot<Map<String, dynamic>>> _getUserInfo() async {
+  // Firebase Functions
+  Future<List<Map<String, dynamic>>> getDataFromFirestore(
+      String path, Map<String, dynamic> Function(QueryDocumentSnapshot) dataMapper) async {
     User? user = FirebaseAuth.instance.currentUser;
 
     if (user != null) {
-      await user.reload();
-      user = FirebaseAuth.instance.currentUser;
+      String userID = user.uid;
+      CollectionReference collectionReference = FirebaseFirestore.instance.collection(path);
 
-      // Use the null-aware operator to safely access uid
-      String? userId = user?.uid;
+      try {
+        QuerySnapshot<Map<String, dynamic>> querySnapshot =
+        await collectionReference.get() as QuerySnapshot<Map<String, dynamic>>;
 
-      if (userId != null) {
-        setState(() {
-          user = user;
-        });
-        return FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .collection('summarizer')
-            .get();
+        return querySnapshot.docs.map((doc) => dataMapper(doc)).toList();
+      } catch (e) {
+        print('Error fetching data from Firestore: $e');
+        throw e;
       }
-    }
-
-    throw Exception('User or user ID is null');
-  }
-
-  Future<Map<String, dynamic>?> getHistoryData(String summarizerId, String historyId) async {
-    try {
-      User? user = FirebaseAuth.instance.currentUser;
-
-      if (user != null) {
-        String? userId = user.uid;
-
-        if (userId != null) {
-          DocumentSnapshot<Map<String, dynamic>> historySnapshot =
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .collection('summarizer')
-              .doc(summarizerId)
-              .collection('history')
-              .doc(historyId)
-              .get();
-
-          if (historySnapshot.exists) {
-            return historySnapshot.data();
-          } else {
-            return null;
-          }
-        }
-      }
-
-      return null;
-    } catch (e) {
-      print('Error fetching history data: $e');
-      return null;
+    } else {
+      print('User is not authenticated.');
+      return [];
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: PreferredSize(
-        preferredSize: Size.fromHeight(100.0),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(5, 20, 5, 20),
-          child: AppBar(
-            title: Text(
-              'History',
-              style: TextStyle(
-                fontFamily: 'Teko',
-                fontSize: 40,
-                fontStyle: FontStyle.italic,
-              ),
-            ),
-            centerTitle: true,
-            leading: IconButton(
-              icon: Icon(Icons.arrow_back),
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => const HomeScreen()),
-                );
-              },
-            ),
-          ),
-        ),
-      ),
-      body: FutureBuilder<QuerySnapshot<Map<String, dynamic>>>(
-        future: _historyCollectionFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Error: ${snapshot.error}'));
-          } else if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return Center(child: Text('No data available.'));
-          } else {
-            List<YourDataModel> data = snapshot.data!.docs.map((doc) {
-              return YourDataModel.fromMap(doc.data()!);
-            }).toList();
+  Future<List<Map<String, dynamic>>> getSummarizerData() async {
+    User? user = FirebaseAuth.instance.currentUser;
 
-            return _buildHistoryList(data);
-          }
+    if (user != null) {
+      String userID = user.uid;
+
+      CollectionReference summarizerCollection =
+      FirebaseFirestore.instance.collection('users/$userID/summarizer');
+
+      try {
+        QuerySnapshot<Map<String, dynamic>> summarizers =
+        await summarizerCollection.get() as QuerySnapshot<Map<String, dynamic>>;
+        List<Map<String, dynamic>> summarizerData = summarizers.docs
+            .map((QueryDocumentSnapshot<Map<String, dynamic>> summarizer) {
+          //print('Document Data: ${summarizer.data()}');
+          Map<String, dynamic>? data = summarizer.data();
+
+          return {
+            'summarizerID': summarizer.id,
+            'timestamp': data?['timestamp'],
+            'filename': data?['fileName'] ?? '',
+            'summary': data?['summary'] ?? '',
+            // Include other fields
+          };
+        }).toList();
+        return summarizerData;
+      } catch (e) {
+        print('Error fetching summarizer data: $e');
+        throw e;
+      }
+    } else {
+      print('User is not authenticated.');
+      return [];
+    }
+  }
+
+  Future<List<Map<String, dynamic>>> getHistoricalData(String summarizerID) async {
+    User? user = FirebaseAuth.instance.currentUser;
+
+    if (user != null) {
+      String userID = user.uid;
+
+      CollectionReference historyCollection = FirebaseFirestore.instance
+          .collection('users/$userID/summarizer/$summarizerID/history');
+
+      try {
+        QuerySnapshot<Map<String, dynamic>> querySnapshot =
+        await historyCollection.get() as QuerySnapshot<Map<String, dynamic>>;
+        List<Map<String, dynamic>> historicalData = querySnapshot.docs
+            .map((QueryDocumentSnapshot<Map<String, dynamic>> doc) {
+          Map<String, dynamic>? data = doc.data();
+
+          return {
+            'historyID': doc.id,
+            'timestamp': doc.data()?['timestamp'], // Replace 'timestamp' with your actual timestamp field
+            'summary': doc.data()?['summary'],
+            // Include other fields
+          };
+        }).toList();
+
+        return historicalData;
+      } catch (e) {
+        print('Error fetching historical data: $e');
+        throw e;
+      }
+    } else {
+      print('User is not authenticated.');
+      return [];
+    }
+  }
+
+  // UI Components
+  Widget _buildSummarizerList(List<Map<String, dynamic>> summarizers) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(10, 0, 10, 0), // Adjust the padding as needed
+      child: ListView.builder(
+        shrinkWrap: true,
+        physics: ClampingScrollPhysics(),
+        itemCount: summarizers.length,
+        itemBuilder: (context, index) {
+          return _buildHistoryItem(context, summarizers[index]);
         },
       ),
     );
   }
 
-  Widget _buildHistoryList(List<YourDataModel> data) {
-    Map<String, List<YourDataModel>> groupedData = groupDataByTime(data);
+  Widget _buildHistoryItem(BuildContext context, Map<String, dynamic> summarizer) {
+    String displayText = summarizer['filename'] != null && summarizer['filename'].isNotEmpty
+        ? summarizer['filename']
+        : summarizer['summary'] ?? '';
 
-    List<String> sortedTimeCategories = groupedData.keys.toList()
-      ..sort((a, b) {
-        if (a == 'Today') return -1;
-        if (b == 'Today') return 1;
-        if (a == 'Tomorrow') return -1;
-        if (b == 'Tomorrow') return 1;
-        return 0;
-      });
-
-    return ListView.builder(
-      padding: EdgeInsets.all(16),
-      itemCount: sortedTimeCategories.length,
-      itemBuilder: (context, index) {
-        String timeCategory = sortedTimeCategories[index];
-        List<YourDataModel> items = groupedData[timeCategory]!;
-
-        return Container(
-          margin: EdgeInsets.only(bottom: 25),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildTimeSubheading(timeCategory),
-              SizedBox(height: 10),
-              Column(
-                children: items.map((item) => _buildHistoryItem(item)).toList(),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildTimeSubheading(String time) {
-    return Text(
-      time,
-      style: TextStyle(
-        fontSize: 18,
-        fontWeight: FontWeight.bold,
-      ),
-    );
-  }
-
-  Widget _buildHistoryItem(YourDataModel item) {
-    String displayText = item.filename != null && item.filename!.isNotEmpty
-        ? item.filename!
-        : item.summary ?? '';
-
-    String shortSummary = displayText.length > 50
-        ? displayText.substring(0, 45) + '...'
-        : displayText;
+    String shortSummary = displayText.length > 50 ? displayText.substring(0, 45) + '...' : displayText;
 
     return GestureDetector(
       onTap: () async {
-        Map<String, dynamic>? historyData = await getHistoryData(item.summarizerId ?? '', item.historyId ?? '');
-
-        if (historyData != null) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => HistoryResultPage(historyData: historyData),
-            ),
-          );
-        } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-            content: Text('Failed to retrieve history data for this item.'),
-          ));
-        }
+        showLatestHistoryPopup(context, summarizer['summarizerID']);
       },
       child: Container(
         padding: EdgeInsets.all(15),
@@ -236,64 +176,233 @@ class _HistoryPageState extends State<HistoryPage> {
     );
   }
 
+  void showLatestHistoryPopup(BuildContext context, String summarizerID) async {
+    List<Map<String, dynamic>> historicalData = await getHistoricalData(summarizerID);
 
+    if (historicalData.isNotEmpty) {
+      historicalData.sort((a, b) {
+        final timestampA = a['timestamp'] as Timestamp?;
+        final timestampB = b['timestamp'] as Timestamp?;
 
-  Map<String, List<YourDataModel>> groupDataByTime(List<YourDataModel> data) {
-    Map<String, List<YourDataModel>> groupedData = {};
+        if (timestampA != null && timestampB != null) {
+          return timestampB.compareTo(timestampA);
+        } else {
+          return 0;
+        }
+      });
 
-    for (var item in data) {
-      String timeCategory = categorizeByTime(item.timestamp);
+      Map<String, dynamic> latestHistory = historicalData.first;
 
-      if (groupedData.containsKey(timeCategory)) {
-        groupedData[timeCategory]!.add(item);
-      } else {
-        groupedData[timeCategory] = [item];
-      }
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('Latest History'),
+            content: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text('Time: ${_formatTimestamp(latestHistory['timestamp'])}'),
+                Text('Summary: ${latestHistory['summary']}'),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    ElevatedButton(
+                      onPressed: () {
+                        FlutterClipboard.copy(latestHistory['summary']); // Copy the summary text to the clipboard
+                        Navigator.of(context).pop(); // Close the dialog
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Summary copied to clipboard')),
+                        );
+                      },
+                      child: Text('Copy'),
+                    ),
+                  ],
+                ),
+                // Display other historical data as needed
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
+    } else {
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: Text('No Historical Data'),
+            content: Text('No historical data available for this summarizer.'),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('Close'),
+              ),
+            ],
+          );
+        },
+      );
     }
-
-    return groupedData;
   }
 
-  String categorizeByTime(DateTime timestamp) {
-    DateTime now = DateTime.now();
-    DateTime today = DateTime(now.year, now.month, now.day);
-    DateTime yesterday = today.subtract(Duration(days: 1));
+  String _formatTimestamp(Timestamp timestamp) {
+    DateTime dateTime = timestamp.toDate();
+    String formattedDateTime = "${dateTime.toLocal()}".split('.')[0];
+    return formattedDateTime;
+  }
 
-    if (timestamp.isAfter(today) && timestamp.isBefore(today.add(Duration(days: 1)))) {
+  Widget _buildCategoryHeader(String category) {
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Text(
+        category,
+        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+    );
+  }
+
+  Widget _buildDaySection(String title, List<Map<String, dynamic>> summarizers) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCategoryHeader(title),
+        _buildSummarizerList(summarizers),
+      ],
+    );
+  }
+
+
+  String _getDayKey(DateTime dateTime) {
+    final now = DateTime.now();
+    final daysDifference = now.difference(dateTime).inDays;
+
+    if (daysDifference == 0) {
       return 'Today';
-    } else if (timestamp.isAfter(yesterday) && timestamp.isBefore(today)) {
-      return 'Yesterday';
-    } else if (timestamp.isAfter(today.subtract(Duration(days: 7))) && timestamp.isBefore(yesterday)) {
+    } else if (daysDifference == 1) {
+      return 'Tomorrow';
+    } else if (daysDifference >= 2 && daysDifference <= 7) {
       return 'Previous 7 Days';
+    } else if (daysDifference > 7) {
+      return 'Previous 30 Days';
     } else {
+      // Handle other cases as needed
       return 'Other';
     }
   }
-}
 
-class YourDataModel {
-  final DateTime timestamp;
-  final String? summary;
-  final String? filename;
-  final String? summarizerId;
-  final String? historyId;
+  Widget _buildCopyButton(String summary) {
+    return Align(
+      alignment: Alignment.topRight,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: ElevatedButton(
+          onPressed: () {
+            FlutterClipboard.copy(summary); // Copy the summary text to the clipboard
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Copied to clipboard'),
+                duration: Duration(seconds: 2), // You can adjust the duration as needed
+              ),
+            );
+          },
+          child: Text('Copy'),
+        ),
+      ),
+    );
+  }
 
-  YourDataModel({
-    required this.timestamp,
-    this.summary,
-    this.filename,
-    this.summarizerId,
-    this.historyId,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: PreferredSize(
+        preferredSize: Size.fromHeight(100.0),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(5, 20, 5, 20),
+          child: AppBar(
+            title: Text(
+              'History',
+              style: TextStyle(
+                fontFamily: 'Teko',
+                fontSize: 40,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            centerTitle: true,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back),
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomeScreen()),
+                );
+              },
+            ),
+          ),
+        ),
+      ),
+      body: FutureBuilder<List<Map<String, dynamic>>>(
+        future: _historyCollectionFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return Center(child: CircularProgressIndicator());
+          } else if (snapshot.hasError) {
+            return Center(child: Text('Error: ${snapshot.error}'));
+          } else if (!snapshot.hasData || snapshot.data!.isEmpty) {
+            return Center(child: Text('No data available.'));
+          } else {
+            List<Map<String, dynamic>> summarizerData = snapshot.data!;
 
-  factory YourDataModel.fromMap(Map<String, dynamic> map) {
-    return YourDataModel(
-      timestamp: (map['timestamp'] as Timestamp).toDate(),
-      summary: map['summary'],
-      filename: map['fileName'],
-      summarizerId: map['summarizerId'],
-      historyId: map['historyId'],
+            // Filter summarizers based on categories
+            List<Map<String, dynamic>> todaySummarizers = [];
+            List<Map<String, dynamic>> tomorrowSummarizers = [];
+            List<Map<String, dynamic>> next7DaysSummarizers = [];
+            List<Map<String, dynamic>> previous7DaysSummarizers = [];
+
+            summarizerData.forEach((summarizer) {
+              final timestamp = (summarizer['timestamp'] as Timestamp).toDate();
+              final dayKey = _getDayKey(timestamp);
+
+              switch (dayKey) {
+                case 'Today':
+                  todaySummarizers.add(summarizer);
+                  break;
+                case 'Tomorrow':
+                  tomorrowSummarizers.add(summarizer);
+                  break;
+                case 'Previous 7 Days':
+                  next7DaysSummarizers.add(summarizer);
+                  break;
+                case 'Previous 30 Days':
+                  previous7DaysSummarizers.add(summarizer);
+                  break;
+              // Handle other cases if needed
+              }
+            });
+
+            return ListView(
+              children: [
+                if (todaySummarizers.isNotEmpty)
+                  _buildDaySection('Today', todaySummarizers),
+                if (tomorrowSummarizers.isNotEmpty)
+                  _buildDaySection('Tomorrow', tomorrowSummarizers),
+                if (next7DaysSummarizers.isNotEmpty)
+                  _buildDaySection('Previous 7 Days', next7DaysSummarizers),
+                if (previous7DaysSummarizers.isNotEmpty)
+                  _buildDaySection('Previous 30 Days', previous7DaysSummarizers),
+              ],
+            );
+          }
+        },
+      ),
     );
   }
 }
-
